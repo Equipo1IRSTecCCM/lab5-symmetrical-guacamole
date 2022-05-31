@@ -5,59 +5,36 @@ Equipo 1
     Samantha Barrón Martínez A01652135
     Jorge Antonio Hoyo García A01658142
 Laboratory 05
-Ciudad de México, /05/2022
+Ciudad de México, 31/05/2022
 '''
 #Importar librerias necesarias
 import cv2
 import numpy as np
 
-def getDeno(M,i,j):
-    return M["m00"]**(1+(i+j)/2)
-
-def getDistance(a,b):
-    return  abs(b-a)/abs(a)
 
 def calcDistance(A,B):
     distancias = []
-    #print(A)
-    '''
-    for i in range(len(A)):
-        t = []
-        for j in range(len(B)):
-            d = 0
-            for k in range(len(B[j])):
-                
-                if A[i][k] != 0:
-                    #print(B[j][k])
-                    
-                    d += abs(B[j][k]-A[i][k])/abs(A[i][k])
-                else:
-                    if B[j][k]-A[i][k] == 0:
-                        d += 0
-                    else:
-                        d += abs(B[j][k]-A[i][k])/0.1
-            t.append(d)
-        distancias.append(t)
-    '''
-    res = []
     for j in range(len(B)):
         d = 0
-        r = 0
-        #print(B[j])
-        for i in range(7):
-            ma = np.sign(A[0][i]) *np.log10(abs(A[0][i]))
-            mb = np.sign(B[j][i]) *np.log10(abs(B[j][i]))
-            d=abs((ma-mb)/ma)
-            if r < d:
-                r = d
-        res.append(r)
-    return res
-    #https://github.com/opencv/opencv/blob/4.x/modules/imgproc/src/matchcontours.cpp
-    #https://github.com/opencv/opencv/blob/4.x/modules/imgproc/src/moments.cpp
+        t = []
+        for k in range(len(B[j])):
+            
+            if A[0][k] != 0:
+                #print(B[j][k])
+                
+                t.append(abs(B[j][k]-A[0][k])/abs(A[0][k]))
+            else:
+                if B[j][k]-A[0][k] == 0:
+                    t.append(0)
+                else:
+                    t.append(abs(B[j][k]-A[0][k])/0.1)
+        
+        distancias.append(t)
+    return distancias
+
 
 def getHuMoments(M):
     moments = []
-    
     moments.append(M["nu20"]+M["nu02"])
     moments.append((M["nu20"]-M["nu02"])**2 + 4*(M["nu11"])**2)
     moments.append((M["nu30"]-(3*M["nu12"]))**2 + (3*M["nu21"]-M["nu03"])**2)
@@ -72,42 +49,29 @@ def getHuMoments(M):
             newMoments.append(-np.sign(moments[i])*np.log(abs(moments[i])))
         else:
             newMoments.append(0.0)
-    return moments
+    return newMoments
 #Cargar imagenes
 img1 = cv2.imread("figs1.png")
 img2 = cv2.imread("figs2.png")
 
 
 #imagen y template a escala de grises
-img1 = cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
-img2 = cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
+img1_g = cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
+img2_g = cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
 
 #Threshold para imagen y template solo para tener los valores blanco y negro
-ret1, thresh1 = cv2.threshold(img1, 176, 255, cv2.THRESH_BINARY_INV)
-ret2, thresh2 = cv2.threshold(img2, 176, 255, cv2.THRESH_BINARY_INV)
+ret1, thresh1 = cv2.threshold(img1_g, 254, 255, cv2.THRESH_BINARY)
+ret2, thresh2 = cv2.threshold(img2_g, 254, 255, cv2.THRESH_BINARY)
 
-#encontrar contornos:
-edged1 = cv2.Canny(img1, 20, 200)
-edged2 = cv2.Canny(img2, 20, 255)
-cv2.imshow('2 - All Contours over blank image', edged2)
-cv2.waitKey(0)
-contours1, hierarchy1 = cv2.findContours(edged1.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-contours2, hierarchy2 = cv2.findContours(img2.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-contours2_t = []
-#print(contours2)
-for c in contours2:
-    x,y,w,h = cv2.boundingRect(c)
-    tempImg = img2[y:y+h,x:x+w]
-    c_temp, hierarchy2 = cv2.findContours(tempImg.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    contours2_t.append(c_temp[0])
-    #print(cv2.matchShapes(img1, tempImg, cv2.CONTOURS_MATCH_I3,0))
-black = np.zeros((img2.shape[0],img2.shape[1],3))
-#print(len(contours1))
+#Sacar contornos
+contours1, hierarchy1 = cv2.findContours(thresh1.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+contours2, hierarchy2 = cv2.findContours(thresh2.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+
 #ordenar los contornos con su area del mayor a menor:
 sortedContours1 = sorted(contours1, key=cv2.contourArea, reverse=True)
-sortedContours2 = sorted(contours2_t, key=cv2.contourArea, reverse=True)
+sortedContours2 = sorted(contours2, key=cv2.contourArea, reverse=True)
 
-#calcular los momentos centrales de los contornos:
+#calcular los momentos centrales y los Hu moments de los contornos:
 M1 = []
 M2 = []
 hm2 = []
@@ -118,26 +82,39 @@ for i in sortedContours1:
 for i in sortedContours2:
     M2.append(cv2.moments(i))
     hm2.append(getHuMoments(M2[-1]))
-    #print(cv2.HuMoments(cv2.moments(i)))
-    #print(hm2[-1])
 
-print()
-
+#Calcular las distancias de los momentos
 dist = calcDistance(hm1,hm2)
-print(dist)
-val = 7.0
+val = 0.1
+c = 0
+for di in dist:
+    if di[0] < val:
+        print(di[0])
+        co = sortedContours2[c]
+        #Imprimir el contorno si son parecidas
+        cv2.drawContours(img2, [co], 0, (0,255,0), 3)
+    #Calcular el centro de masa 
+    cm = (int(M2[c]['m10']/M2[c]['m00']),int(M2[c]['m01']/M2[c]['m00']))
+    cv2.circle(img2,cm,3,(0,255,0),2)
+    #Calcular la elipse equivalente
+    cov = np.asarray([[M2[c]['mu20'], M2[c]['mu11']],
+                        [M2[c]['mu11'], M2[c]['mu20']]])
+    eigvalues, eigvectors = np.linalg.eig(cov)
+    eigval_1, eigval_2 = eigvalues
+    eigvec_1, eigvec_2 = eigvectors[:, 0], eigvectors[:, 1]
+    theta = np.arctan2(eigvec_1[1], eigvec_1[0])
+    angle = np.rad2deg(theta)
 
-for j in range(len(dist)):
-    if dist[j] <= val:
-        #print(dist[i][j])
-        c = contours2[j]
-        cv2.drawContours(black, [c], 0, (0,255,0), 3)
-        cv2.imshow('Contours by area', black)
+    a = np.sqrt((eigval_1/M2[c]['m00'])) * 2
+    b = np.sqrt((eigval_2/M2[c]['m00'])) * 2
+    print(a,b)
+    r = a/b
+    #Grax: https://notebook.community/hadim/public_notebooks/Analysis/Fit_Ellipse/notebook
+    #Imprimit en imagen
+    cv2.ellipse(img2, cm, (int(a), int(b)),angle,0,360,(0,0,255),3)
+    cv2.putText(img2, str(round(r,4)), cm, cv2.FONT_HERSHEY_TRIPLEX, 0.9, (0,0,255), 1, cv2.LINE_AA)
+    c+=1
+cv2.imshow('Yo y mis hermanos', img2)
 cv2.waitKey(0)
-'''
-for c in contours1:
-    cv2.drawContours(black, [c], 0, (0,255,0), 3)
-    cv2.imshow('Contours by area', black)
-    cv2.waitKey(0)
-'''
+
 
